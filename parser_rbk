@@ -1,0 +1,46 @@
+import feedparser
+import telebot
+import time
+import os
+
+# Переменные окружения (заполняются в Render)
+API_ID = os.getenv("API_ID")
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_ID = os.getenv("CHANNEL_ID")
+RSS_FEED = os.getenv("RSS_FEED", "https://www.rbc.ru/rss/")
+
+# Инициализация бота
+bot = telebot.TeleBot(BOT_TOKEN)
+
+# Храним последние заголовки, чтобы не дублировать
+posted_links = set()
+
+
+def fetch_rss():
+    """Получает новости из RSS"""
+    feed = feedparser.parse(RSS_FEED)
+    articles = []
+    for entry in feed.entries[:5]:  # Берем 5 свежих новостей
+        title = entry.title
+        link = entry.link
+        summary = entry.summary
+        if link not in posted_links:
+            articles.append((title, summary, link))
+            posted_links.add(link)
+    return articles
+
+
+def send_news():
+    """Отправляет новости в Telegram-канал"""
+    articles = fetch_rss()
+    for title, summary, link in articles:
+        message = f"<b>{title}</b>\n\n{summary}\n\n<a href=\"{link}\">Читать полностью</a>"
+        bot.send_message(CHANNEL_ID, message, parse_mode="HTML")
+        time.sleep(3)  # Пауза между отправкой, чтобы избежать блокировок
+
+
+if __name__ == "__main__":
+    while True:
+        send_news()
+        time.sleep(1800)  # Запрашивать новости каждые 30 минут
